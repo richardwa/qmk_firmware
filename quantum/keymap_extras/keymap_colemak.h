@@ -1,7 +1,7 @@
 #ifndef KEYMAP_COLEMAK_H
 #define KEYMAP_COLEMAK_H
 
-#include "keymap.h"
+#include "keymap_common.h"
 // For software implementation of colemak
 #define CM_Q    KC_Q
 #define CM_W    KC_W

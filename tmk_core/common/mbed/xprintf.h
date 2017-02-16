@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-int __xprintf(const char *format, ...);
+int xprintf(const char *format, ...);
 
 #ifdef __cplusplus
 }

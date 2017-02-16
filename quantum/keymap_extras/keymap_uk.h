@@ -1,10 +1,10 @@
 #ifndef KEYMAP_UK_H
 #define KEYMAP_UK_H
 
-#include "keymap.h"
+#include "keymap_common.h"
 
 // Alt gr
-#define ALGR(kc) RALT(kc)
+#define ALGR(kc) kc | 0x1400
 #define NO_ALGR KC_RALT
 
 // Normal characters

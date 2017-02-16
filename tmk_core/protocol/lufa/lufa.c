@@ -1,4 +1,4 @@
-/*
+/* 
  * Copyright 2012 Jun Wako <wakojun@gmail.com>
  * This file is based on:
  *     LUFA-120219/Demos/Device/Lowlevel/KeyboardMouse
@@ -51,15 +51,6 @@
 
 #include "descriptor.h"
 #include "lufa.h"
-#include "quantum.h"
-#include <util/atomic.h>
-
-#ifdef NKRO_ENABLE
-  #include "keycode_config.h"
-
-  extern keymap_config_t keymap_config;
-#endif
-
 
 #ifdef AUDIO_ENABLE
     #include <audio.h>
@@ -67,25 +58,6 @@
 
 #ifdef BLUETOOTH_ENABLE
     #include "bluetooth.h"
-#endif
-#ifdef ADAFRUIT_BLE_ENABLE
-    #include "adafruit_ble.h"
-#endif
-
-#ifdef VIRTSER_ENABLE
-    #include "virtser.h"
-#endif
-
-#if (defined(RGB_MIDI) | defined(RGBLIGHT_ANIMATIONS)) & defined(RGBLIGHT_ENABLE)
-    #include "rgblight.h"
-#endif
-
-#ifdef MIDI_ENABLE
-  #include "sysex_tools.h"
-#endif
-
-#ifdef RAW_ENABLE
-	#include "raw_hid.h"
 #endif
 
 uint8_t keyboard_idle = 0;
@@ -96,9 +68,9 @@ static uint8_t keyboard_led_stats = 0;
 static report_keyboard_t keyboard_report_sent;
 
 #ifdef MIDI_ENABLE
-static void usb_send_func(MidiDevice * device, uint16_t cnt, uint8_t byte0, uint8_t byte1, uint8_t byte2);
-static void usb_get_midi(MidiDevice * device);
-static void midi_usb_init(MidiDevice * device);
+void usb_send_func(MidiDevice * device, uint16_t cnt, uint8_t byte0, uint8_t byte1, uint8_t byte2);
+void usb_get_midi(MidiDevice * device);
+void midi_usb_init(MidiDevice * device);
 #endif
 
 /* Host driver */
@@ -155,108 +127,6 @@ USB_ClassInfo_MIDI_Device_t USB_MIDI_Interface =
 #define SYS_COMMON_3 0x30
 #endif
 
-#ifdef VIRTSER_ENABLE
-USB_ClassInfo_CDC_Device_t cdc_device =
-{
-  .Config =
-  {
-    .ControlInterfaceNumber = CCI_INTERFACE,
-    .DataINEndpoint         =
-    {
-      .Address		= CDC_IN_EPADDR,
-      .Size		= CDC_EPSIZE,
-      .Banks		= 1,
-    },
-    .DataOUTEndpoint	    =
-    {
-      .Address		= CDC_OUT_EPADDR,
-      .Size		= CDC_EPSIZE,
-      .Banks		= 1,
-    },
-    .NotificationEndpoint   =
-    {
-      .Address		= CDC_NOTIFICATION_EPADDR,
-      .Size		= CDC_NOTIFICATION_EPSIZE,
-      .Banks		= 1,
-    },
-  },
-};
-#endif
-
-#ifdef RAW_ENABLE
-
-void raw_hid_send( uint8_t *data, uint8_t length )
-{
-	// TODO: implement variable size packet
-	if ( length != RAW_EPSIZE )
-	{
-		return;
-	}
-
-	if (USB_DeviceState != DEVICE_STATE_Configured)
-	{
-		return;
-	}
-
-	// TODO: decide if we allow calls to raw_hid_send() in the middle
-	// of other endpoint usage.
-	uint8_t ep = Endpoint_GetCurrentEndpoint();
-
-	Endpoint_SelectEndpoint(RAW_IN_EPNUM);
-
-	// Check to see if the host is ready to accept another packet
-	if (Endpoint_IsINReady())
-	{
-		// Write data
-		Endpoint_Write_Stream_LE(data, RAW_EPSIZE, NULL);
-		// Finalize the stream transfer to send the last packet
-		Endpoint_ClearIN();
-	}
-
-	Endpoint_SelectEndpoint(ep);
-}
-
-__attribute__ ((weak))
-void raw_hid_receive( uint8_t *data, uint8_t length )
-{
-	// Users should #include "raw_hid.h" in their own code
-	// and implement this function there. Leave this as weak linkage
-	// so users can opt to not handle data coming in.
-}
-
-static void raw_hid_task(void)
-{
-	// Create a temporary buffer to hold the read in data from the host
-	uint8_t data[RAW_EPSIZE];
-	bool data_read = false;
-
-	// Device must be connected and configured for the task to run
-	if (USB_DeviceState != DEVICE_STATE_Configured)
-	return;
-
-	Endpoint_SelectEndpoint(RAW_OUT_EPNUM);
-
-	// Check to see if a packet has been sent from the host
-	if (Endpoint_IsOUTReceived())
-	{
-		// Check to see if the packet contains data
-		if (Endpoint_IsReadWriteAllowed())
-		{
-			/* Read data */
-			Endpoint_Read_Stream_LE(data, sizeof(data), NULL);
-			data_read = true;
-		}
-
-		// Finalize the stream transfer to receive the last packet
-		Endpoint_ClearOUT();
-
-		if ( data_read )
-		{
-			raw_hid_receive( data, sizeof(data) );
-		}
-	}
-}
-#endif
 
 /*******************************************************************************
  * Console
@@ -282,10 +152,10 @@ static void Console_Task(void)
         {
             /* Create a temporary buffer to hold the read in report from the host */
             uint8_t ConsoleData[CONSOLE_EPSIZE];
-
+ 
             /* Read Console Report Data */
             Endpoint_Read_Stream_LE(&ConsoleData, sizeof(ConsoleData), NULL);
-
+ 
             /* Process Console Report Data */
             //ProcessConsoleHIDReport(ConsoleData);
         }
@@ -312,6 +182,10 @@ static void Console_Task(void)
     }
 
     Endpoint_SelectEndpoint(ep);
+}
+#else
+static void Console_Task(void)
+{
 }
 #endif
 
@@ -342,7 +216,7 @@ void EVENT_USB_Device_Disconnect(void)
     print("[D]");
     /* For battery powered device */
     USB_IsInitialized = false;
-/* TODO: This doesn't work. After several plug in/outs can not be enumerated.
+/* TODO: This doesn't work. After several plug in/outs can not be enumerated. 
     if (USB_IsInitialized) {
         USB_Disable();  // Disable all interrupts
 	USB_Controller_Enable();
@@ -376,14 +250,10 @@ void EVENT_USB_Device_WakeUp()
 #endif
 }
 
-
-
 #ifdef CONSOLE_ENABLE
 static bool console_flush = false;
 #define CONSOLE_FLUSH_SET(b)   do { \
-  ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {\
-    console_flush = b; \
-  } \
+    uint8_t sreg = SREG; cli(); console_flush = b; SREG = sreg; \
 } while (0)
 
 // called every 1ms
@@ -397,7 +267,6 @@ void EVENT_USB_Device_StartOfFrame(void)
     Console_Task();
     console_flush = false;
 }
-
 #endif
 
 /** Event handler for the USB_ConfigurationChanged event.
@@ -426,14 +295,6 @@ void EVENT_USB_Device_ConfigurationChanged(void)
                                      EXTRAKEY_EPSIZE, ENDPOINT_BANK_SINGLE);
 #endif
 
-#ifdef RAW_ENABLE
-    /* Setup Raw HID Report Endpoints */
-    ConfigSuccess &= ENDPOINT_CONFIG(RAW_IN_EPNUM, EP_TYPE_INTERRUPT, ENDPOINT_DIR_IN,
-									 RAW_EPSIZE, ENDPOINT_BANK_SINGLE);
-    ConfigSuccess &= ENDPOINT_CONFIG(RAW_OUT_EPNUM, EP_TYPE_INTERRUPT, ENDPOINT_DIR_OUT,
-									 RAW_EPSIZE, ENDPOINT_BANK_SINGLE);
-#endif
-
 #ifdef CONSOLE_ENABLE
     /* Setup Console HID Report Endpoints */
     ConfigSuccess &= ENDPOINT_CONFIG(CONSOLE_IN_EPNUM, EP_TYPE_INTERRUPT, ENDPOINT_DIR_IN,
@@ -452,13 +313,7 @@ void EVENT_USB_Device_ConfigurationChanged(void)
 
 #ifdef MIDI_ENABLE
     ConfigSuccess &= Endpoint_ConfigureEndpoint(MIDI_STREAM_IN_EPADDR, EP_TYPE_BULK, MIDI_STREAM_EPSIZE, ENDPOINT_BANK_SINGLE);
-    ConfigSuccess &= Endpoint_ConfigureEndpoint(MIDI_STREAM_OUT_EPADDR, EP_TYPE_BULK, MIDI_STREAM_EPSIZE, ENDPOINT_BANK_SINGLE);
-#endif
-
-#ifdef VIRTSER_ENABLE
-    ConfigSuccess &= Endpoint_ConfigureEndpoint(CDC_NOTIFICATION_EPADDR, EP_TYPE_INTERRUPT, CDC_NOTIFICATION_EPSIZE, ENDPOINT_BANK_SINGLE);
-    ConfigSuccess &= Endpoint_ConfigureEndpoint(CDC_OUT_EPADDR, EP_TYPE_BULK, CDC_EPSIZE, ENDPOINT_BANK_SINGLE);
-    ConfigSuccess &= Endpoint_ConfigureEndpoint(CDC_IN_EPADDR, EP_TYPE_BULK, CDC_EPSIZE, ENDPOINT_BANK_SINGLE);
+    ConfigSuccess &= Endpoint_ConfigureEndpoint(MIDI_STREAM_OUT_EPADDR, EP_TYPE_BULK, MIDI_STREAM_EPSIZE, ENDPOINT_BANK_SINGLE);    
 #endif
 }
 
@@ -581,50 +436,19 @@ void EVENT_USB_Device_ControlRequest(void)
 
             break;
     }
-
-#ifdef VIRTSER_ENABLE
-    CDC_Device_ProcessControlRequest(&cdc_device);
-#endif
 }
 
 /*******************************************************************************
- * Host driver
-p
+ * Host driver 
  ******************************************************************************/
 static uint8_t keyboard_leds(void)
 {
     return keyboard_led_stats;
 }
 
-#define SendToUSB 1
-#define SendToBT  2
-#define SendToBLE 4
-
-static inline uint8_t where_to_send(void) {
-#ifdef ADAFRUIT_BLE_ENABLE
-#if 0
-  if (adafruit_ble_is_connected()) {
-    // For testing, send to BLE as a priority
-    return SendToBLE;
-  }
-#endif
-
-  // This is the real policy
-  if (USB_DeviceState != DEVICE_STATE_Configured) {
-    if (adafruit_ble_is_connected()) {
-      return SendToBLE;
-    }
-  }
-#endif
-  return ((USB_DeviceState == DEVICE_STATE_Configured) ? SendToUSB : 0)
-#ifdef BLUETOOTH_ENABLE
-    || SendToBT
-#endif
-    ;
-}
-
 static void send_keyboard(report_keyboard_t *report)
 {
+
 #ifdef BLUETOOTH_ENABLE
     bluefruit_serial_send(0xFD);
     for (uint8_t i = 0; i < KEYBOARD_EPSIZE; i++) {
@@ -633,21 +457,13 @@ static void send_keyboard(report_keyboard_t *report)
 #endif
 
     uint8_t timeout = 255;
-    uint8_t where = where_to_send();
 
-#ifdef ADAFRUIT_BLE_ENABLE
-    if (where & SendToBLE) {
-      adafruit_ble_send_keys(report->mods, report->keys, sizeof(report->keys));
-    }
-#endif
-
-    if (!(where & SendToUSB)) {
-      return;
-    }
+    if (USB_DeviceState != DEVICE_STATE_Configured)
+        return;
 
     /* Select the Keyboard Report Endpoint */
 #ifdef NKRO_ENABLE
-    if (keyboard_protocol && keymap_config.nkro) {
+    if (keyboard_protocol && keyboard_nkro) {
         /* Report protocol - NKRO */
         Endpoint_SelectEndpoint(NKRO_IN_EPNUM);
 
@@ -696,17 +512,8 @@ static void send_mouse(report_mouse_t *report)
 
     uint8_t timeout = 255;
 
-    uint8_t where = where_to_send();
-
-#ifdef ADAFRUIT_BLE_ENABLE
-    if (where & SendToBLE) {
-      // FIXME: mouse buttons
-      adafruit_ble_send_mouse_move(report->x, report->y, report->v, report->h);
-    }
-#endif
-    if (!(where & SendToUSB)) {
-      return;
-    }
+    if (USB_DeviceState != DEVICE_STATE_Configured)
+        return;
 
     /* Select the Mouse Report Endpoint */
     Endpoint_SelectEndpoint(MOUSE_IN_EPNUM);
@@ -732,7 +539,7 @@ static void send_system(uint16_t data)
 
     report_extra_t r = {
         .report_id = REPORT_ID_SYSTEM,
-        .usage = data - SYSTEM_POWER_DOWN + 1
+        .usage = data
     };
     Endpoint_SelectEndpoint(EXTRAKEY_IN_EPNUM);
 
@@ -756,7 +563,7 @@ static void send_consumer(uint16_t data)
     bluefruit_serial_send(0x00);
     bluefruit_serial_send(0x02);
     bluefruit_serial_send((bitmap>>8)&0xFF);
-    bluefruit_serial_send(bitmap&0xFF);
+    bluefruit_serial_send(bitmap&0xFF); 
     bluefruit_serial_send(0x00);
     bluefruit_serial_send(0x00);
     bluefruit_serial_send(0x00);
@@ -764,16 +571,9 @@ static void send_consumer(uint16_t data)
 #endif
 
     uint8_t timeout = 255;
-    uint8_t where = where_to_send();
 
-#ifdef ADAFRUIT_BLE_ENABLE
-    if (where & SendToBLE) {
-      adafruit_ble_send_consumer_key(data, 0);
-    }
-#endif
-    if (!(where & SendToUSB)) {
-      return;
-    }
+    if (USB_DeviceState != DEVICE_STATE_Configured)
+        return;
 
     report_extra_t r = {
         .report_id = REPORT_ID_CONSUMER,
@@ -863,7 +663,7 @@ int8_t sendchar(uint8_t c)
  ******************************************************************************/
 
 #ifdef MIDI_ENABLE
-static void usb_send_func(MidiDevice * device, uint16_t cnt, uint8_t byte0, uint8_t byte1, uint8_t byte2) {
+void usb_send_func(MidiDevice * device, uint16_t cnt, uint8_t byte0, uint8_t byte1, uint8_t byte2) {
   MIDI_EventPacket_t event;
   event.Data1 = byte0;
   event.Data2 = byte1;
@@ -923,7 +723,7 @@ static void usb_send_func(MidiDevice * device, uint16_t cnt, uint8_t byte0, uint
   USB_USBTask();
 }
 
-static void usb_get_midi(MidiDevice * device) {
+void usb_get_midi(MidiDevice * device) {
   MIDI_EventPacket_t event;
   while (MIDI_Device_ReceiveEventPacket(&USB_MIDI_Interface, &event)) {
 
@@ -953,12 +753,12 @@ static void usb_get_midi(MidiDevice * device) {
   USB_USBTask();
 }
 
-static void midi_usb_init(MidiDevice * device){
+void midi_usb_init(MidiDevice * device){
   midi_device_init(device);
   midi_device_set_send_func(device, usb_send_func);
   midi_device_set_pre_input_process_func(device, usb_get_midi);
 
-  // SetupHardware();
+  SetupHardware();
   sei();
 }
 
@@ -1031,61 +831,6 @@ void MIDI_Task(void)
 
 #endif
 
-/*******************************************************************************
- * VIRTUAL SERIAL
- ******************************************************************************/
-
-#ifdef VIRTSER_ENABLE
-void virtser_init(void)
-{
-  cdc_device.State.ControlLineStates.DeviceToHost = CDC_CONTROL_LINE_IN_DSR ;
-  CDC_Device_SendControlLineStateChange(&cdc_device);
-}
-
-void virtser_recv(uint8_t c) __attribute__ ((weak));
-void virtser_recv(uint8_t c)
-{
-  // Ignore by default
-}
-
-void virtser_task(void)
-{
-  uint16_t count = CDC_Device_BytesReceived(&cdc_device);
-  uint8_t ch;
-  if (count)
-  {
-    ch = CDC_Device_ReceiveByte(&cdc_device);
-    virtser_recv(ch);
-  }
-}
-void virtser_send(const uint8_t byte)
-{
-  uint8_t timeout = 255;
-  uint8_t ep = Endpoint_GetCurrentEndpoint();
-
-  if (cdc_device.State.ControlLineStates.HostToDevice & CDC_CONTROL_LINE_OUT_DTR)
-  {
-    /* IN packet */
-    Endpoint_SelectEndpoint(cdc_device.Config.DataINEndpoint.Address);
-
-    if (!Endpoint_IsEnabled() || !Endpoint_IsConfigured()) {
-        Endpoint_SelectEndpoint(ep);
-        return;
-    }
-
-    while (timeout-- && !Endpoint_IsReadWriteAllowed()) _delay_us(40);
-
-    Endpoint_Write_8(byte);
-    CDC_Device_Flush(&cdc_device);
-
-    if (Endpoint_IsINReady()) {
-      Endpoint_ClearIN();
-    }
-
-    Endpoint_SelectEndpoint(ep);
-  }
-}
-#endif
 
 /*******************************************************************************
  * main
@@ -1097,10 +842,7 @@ static void setup_mcu(void)
     wdt_disable();
 
     /* Disable clock division */
-    // clock_prescale_set(clock_div_1);
-
-    CLKPR = (1 << CLKPCE);
-    CLKPR = (0 << CLKPS3) | (0 << CLKPS2) | (0 << CLKPS1) | (0 << CLKPS0);
+    clock_prescale_set(clock_div_1);
 }
 
 static void setup_usb(void)
@@ -1145,7 +887,7 @@ int main(void)
     midi_register_cc_callback(&midi_device, cc_callback);
     midi_register_sysex_callback(&midi_device, sysex_callback);
 
-    // init_notes();
+    init_notes();
     // midi_send_cc(&midi_device, 0, 1, 2);
     // midi_send_cc(&midi_device, 15, 1, 0);
     // midi_send_noteon(&midi_device, 0, 64, 127);
@@ -1177,13 +919,9 @@ int main(void)
     sleep_led_init();
 #endif
 
-#ifdef VIRTSER_ENABLE
-    virtser_init();
-#endif
-
     print("Keyboard start.\n");
     while (1) {
-        #if !defined(BLUETOOTH_ENABLE) && !defined(ADAFRUIT_BLE_ENABLE)
+        #ifndef BLUETOOTH_ENABLE
         while (USB_DeviceState == DEVICE_STATE_Suspended) {
             print("[s]");
             suspend_power_down();
@@ -1193,34 +931,15 @@ int main(void)
         }
         #endif
 
-        keyboard_task();
-
 #ifdef MIDI_ENABLE
         midi_device_process(&midi_device);
         // MIDI_Task();
 #endif
-
-#if defined(RGBLIGHT_ANIMATIONS) & defined(RGBLIGHT_ENABLE)
-        rgblight_task();
-#endif
-
-#ifdef ADAFRUIT_BLE_ENABLE
-        adafruit_ble_task();
-#endif
-
-#ifdef VIRTSER_ENABLE
-        virtser_task();
-        CDC_Device_USBTask(&cdc_device);
-#endif
-
-#ifdef RAW_ENABLE
-        raw_hid_task();
-#endif
+        keyboard_task();
 
 #if !defined(INTERRUPT_CONTROL_ENDPOINT)
         USB_USBTask();
 #endif
-
     }
 }
 
@@ -1232,10 +951,10 @@ void fallthrough_callback(MidiDevice * device,
   if (cnt == 3) {
     switch (byte0 & 0xF0) {
         case MIDI_NOTEON:
-            play_note(((double)261.6)*pow(2.0, -4.0)*pow(2.0,(byte1 & 0x7F)/12.0), (byte2 & 0x7F) / 8);
+            play_note(((double)261.6)*pow(2.0, -1.0)*pow(2.0,(byte1 & 0x7F)/12.0), (byte2 & 0x7F) / 8);
             break;
         case MIDI_NOTEOFF:
-            stop_note(((double)261.6)*pow(2.0, -4.0)*pow(2.0,(byte1 & 0x7F)/12.0));
+            stop_note(((double)261.6)*pow(2.0, -1.0)*pow(2.0,(byte1 & 0x7F)/12.0));
             break;
     }
   }
@@ -1245,50 +964,15 @@ void fallthrough_callback(MidiDevice * device,
 #endif
 }
 
-
 void cc_callback(MidiDevice * device,
     uint8_t chan, uint8_t num, uint8_t val) {
   //sending it back on the next channel
-  // midi_send_cc(device, (chan + 1) % 16, num, val);
+  midi_send_cc(device, (chan + 1) % 16, num, val);
 }
 
-#ifdef API_SYSEX_ENABLE
-uint8_t midi_buffer[MIDI_SYSEX_BUFFER] = {0};
-#endif
-
-void sysex_callback(MidiDevice * device, uint16_t start, uint8_t length, uint8_t * data) {
-    #ifdef API_SYSEX_ENABLE
-        // SEND_STRING("\n");
-        // send_word(start);
-        // SEND_STRING(": ");
-        // Don't store the header
-        int16_t pos = start - 4;
-        for (uint8_t place = 0; place < length; place++) {
-            // send_byte(*data);
-            if (pos >= 0) {
-                if (*data == 0xF7) {
-                    // SEND_STRING("\nRD: ");
-                    // for (uint8_t i = 0; i < start + place + 1; i++){
-                    //     send_byte(midi_buffer[i]);
-                    // SEND_STRING(" ");
-                    // }
-                    const unsigned decoded_length = sysex_decoded_length(pos);
-                    uint8_t decoded[API_SYSEX_MAX_SIZE];
-                    sysex_decode(decoded, midi_buffer, pos);
-                    process_api(decoded_length, decoded);
-                    return;
-                }
-                else if (pos >= MIDI_SYSEX_BUFFER) {
-                    return;
-                }
-                midi_buffer[pos] = *data;
-            }
-            // SEND_STRING(" ");
-            data++;
-            pos++;
-        }
-    #endif
+void sysex_callback(MidiDevice * device,
+    uint16_t start, uint8_t length, uint8_t * data) {
+  for (int i = 0; i < length; i++)
+    midi_send_cc(device, 15, 0x7F & data[i], 0x7F & (start + i));
 }
-
-
 #endif

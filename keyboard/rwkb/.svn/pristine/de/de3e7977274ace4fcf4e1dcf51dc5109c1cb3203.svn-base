@@ -1,0 +1,14 @@
+#!/bin/bash
+
+BOARD=atmega32u4
+PORT=/dev/ttyACM0
+PROG=avr109
+FILE=rwkb.hex
+
+ls "$PORT"
+while [ $? -ne 0 ]
+do
+    sleep 1
+    ls "$PORT"
+done
+avrdude -v -C /etc/avrdude.conf -p $BOARD -P $PORT -c $PROG -b 57600 -U flash:w:$FILE

@@ -1,0 +1,24 @@
+#include <avr/io.h>
+
+#define rowsize 3
+#define colsize 3
+
+#define rowControl DDRB
+#define rowPort PORTB
+#define rowMask 0b01110000
+
+#define colControl DDRD
+#define colPort PORTD
+#define colMask 0b00000111
+
+#define setBits(val,mask,bits) (val = ((~(mask) & val) | ((mask) & (bits))))
+
+#define setCols(bits) setBits(colPort,colMask,bits)
+#define setColControl(bits) setBits(colControl,colMask,bits)
+#define setRows(bits) (rowPort = ((~rowMask & rowPort) | (rowMask & (bits))))
+#define setRowControl(bits) (rowControl = ((~rowMask & rowControl) | (rowMask & (bits))))
+
+void ledMatrixInit();
+void draw();
+void setRowState(uint8_t row, uint8_t blues[], uint8_t reds[]);
+void setState(uint8_t row, uint8_t col, uint8_t blue, uint8_t red);

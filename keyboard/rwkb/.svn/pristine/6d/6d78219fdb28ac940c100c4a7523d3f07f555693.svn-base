@@ -1,0 +1,124 @@
+#include "ledmatrix.h"
+#include "ledmatrix-config.c"
+#include "cpp-utility.h"
+#include <util/atomic.h>
+
+#define LED_MAT_PERIOD 15
+#define LED_MAT_NUMCOLORS 2
+#define LED_MAT_PORT(x) PORT##x 
+#define LED_MAT_CTRL(x) DDR##x 
+
+//memory map of led states
+// instead of holding physical state (row x cols), we are holding 
+// pin state per cycle to minimize transformations on reading 
+#define LED_MAT_SIZE (LED_MAT_PERIOD * LED_MAT_ROWSIZE * LED_MAT_NUMCOLORS)
+#define LED_MAT_IDX(p,r,c) \
+    ((p) * LED_MAT_ROWSIZE * LED_MAT_NUMCOLORS) +\
+    ((r) * LED_MAT_NUMCOLORS) + (c)
+
+static volatile uint8_t state[LED_MAT_SIZE][SIZE(LED_MAT_ALLP)] = {{0}};
+static volatile uint8_t cycle = 0;
+void ledMatrixInit(){
+//set ports to output    
+#define lambda(mask,p) \
+    LED_MAT_CTRL(p) |= mask;
+    MAP2(lambda,EMPTY,LED_MAT_ALLMASK,LED_MAT_ALLP)
+#undef lambda
+
+    //set row states, these show remain constant after being set here
+    for (int j=0;j<(LED_MAT_PERIOD);j++){
+#define nested(pinmask,i,row) \
+    state[LED_MAT_IDX(j,row,0)][i] = pinmask; \
+    state[LED_MAT_IDX(j,row,1)][i] = pinmask; 
+
+#define lambda(index) \
+    MAP3(nested,EMPTY,LED_MAT_ROW##index,IDX(LED_MAT_ALLP),REPEAT(index,LED_MAT_ALLP))
+    MAP(lambda,EMPTY,IDXNUM(LED_MAT_ROWSIZE))
+#undef lambda 
+#undef nested 
+    }
+    //set initial matrix state
+    for (uint8_t i=0;i<LED_MAT_ROWSIZE;i++){
+        for (uint8_t j=0;j<LED_MAT_COLSIZE;j++){
+            ledMatrixSetState(i,j,0xFF);
+        }
+    }
+}
+
+//value is 0-15 indicating intensity, first half is for blue then red
+// 0 - off
+// 1 - 2/16 frames, every frame in period
+// 2 every 2 frames,
+// 3 every 3 frames, and so on
+void ledMatrixSetState(uint8_t row, uint8_t col, uint8_t value){
+    //ranges from 1 to PERIOD + 1
+    uint8_t blueMod = LED_MAT_PERIOD - (0x0F & value) + 1;
+    uint8_t redMod  = LED_MAT_PERIOD - (value >> 4) +1;
+
+    for (int j=0;j<LED_MAT_PERIOD;j++){
+#define nested(pinmask,i) \
+    if ((j+1)%blueMod) state[LED_MAT_IDX(j,row,0)][i] &= ~(pinmask);\
+        else       state[LED_MAT_IDX(j,row,0)][i] |=   pinmask; \
+    if ((j+1)%redMod)  state[LED_MAT_IDX(j,row,1)][i] &= ~(pinmask);\
+        else       state[LED_MAT_IDX(j,row,1)][i] |=   pinmask; 
+
+#define lambda(index) \
+        if (col == index){ \
+    MAP2(nested,EMPTY,LED_MAT_COL##index,IDX(LED_MAT_ALLP)) \
+        }
+
+    MAP(lambda,EMPTY,IDXNUM(LED_MAT_COLSIZE))
+
+#undef lambda 
+#undef nested 
+    }
+}
+
+void ledMatrixDraw(){
+
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+    //declare holders for all ports
+    //apply mask on holders
+    //also need control port to set all low pins to input/disconnected state
+#define lambda(mask,p,i) \
+    uint8_t port_##p = LED_MAT_PORT(p); \
+    uint8_t ctrl_##p = (~(mask) & LED_MAT_CTRL(p)) | ((mask) & state[cycle][i]);
+    MAP3(lambda,EMPTY,LED_MAT_ALLMASK,LED_MAT_ALLP,IDX(LED_MAT_ALLP))
+#undef lambda
+
+    //flag for current color in cycle
+    uint8_t color = (cycle % LED_MAT_NUMCOLORS) == 1;
+    uint8_t someColumnOn = 0;
+
+    //set columns
+#define lambda(mask,p,i) \
+    someColumnOn |= (mask) & state[cycle][i]; \
+    port_##p = (~(mask) & port_##p) | ((mask) & (color ? \
+            ~(state[cycle][i]):(state[cycle][i])));
+    MAP3(lambda,EMPTY,LED_MAT_COLMASK,LED_MAT_ALLP,IDX(LED_MAT_ALLP))
+#undef lambda
+   
+    //set rows
+#define lambda(mask,p,i) \
+    if (!someColumnOn) ctrl_##p &= ~(mask); \
+    port_##p = (~(mask) & port_##p) | ((mask) & (color ? \
+            (state[cycle][i]):~(state[cycle][i])));
+    MAP3(lambda,EMPTY,LED_MAT_ROWMASK,LED_MAT_ALLP,IDX(LED_MAT_ALLP))
+#undef lambda
+
+    //assign holders into ports
+#define lambda(p) \
+    LED_MAT_PORT(p) = port_##p;
+    MAP(lambda,EMPTY,LED_MAT_ALLP)
+#undef lambda
+#define lambda(p) \
+    LED_MAT_CTRL(p) = ctrl_##p;
+    MAP(lambda,EMPTY,LED_MAT_ALLP)
+#undef lambda
+    }
+    cycle++;
+    if (cycle >= LED_MAT_SIZE){
+        cycle = 0;
+    }
+
+}

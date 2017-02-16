@@ -1,10 +1,10 @@
 #ifndef KEYMAP_GERMAN
 #define KEYMAP_GERMAN
 
-#include "keymap.h"
+#include "keymap_common.h"
 
 // Alt gr
-#define ALGR(kc) RALT(kc)
+#define ALGR(kc) kc | 0x1400
 #define DE_ALGR KC_RALT
 
 // normal characters

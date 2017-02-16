@@ -1,7 +1,7 @@
 #ifndef KEYMAP_FRENCH_OSX_H
 #define KEYMAP_FRENCH_OSX_H
 
-#include "keymap.h"
+#include "keymap_common.h"
 
 // Normal characters
 #define FR_AT 	KC_GRV

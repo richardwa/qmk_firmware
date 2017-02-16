@@ -18,5 +18,4 @@ endif
 
 
 # Search Path
-VPATH += $(TMK_PATH)/$(VUSB_DIR)
-VPATH += $(TMK_PATH)/$(VUSB_DIR)/usbdrv
+VPATH += $(TMK_DIR)/protocol/vusb:$(TMK_DIR)/protocol/vusb/usbdrv

@@ -30,12 +30,6 @@
 #include "util.h"
 #include "host.h"
 
-#ifdef NKRO_ENABLE
-  #include "keycode_config.h"
-
-  extern keymap_config_t keymap_config;
-#endif
-
 
 // protocol setting from the host.  We use exactly the same report
 // either way, so this variable only stores the setting since we
@@ -62,7 +56,7 @@ int8_t usb_keyboard_send_report(report_keyboard_t *report)
     int8_t result = 0;
 
 #ifdef NKRO_ENABLE
-    if (keymap_config.nkro)
+    if (keyboard_nkro)
         result = send_report(report, KBD2_ENDPOINT, 0, KBD2_SIZE);
     else
 #endif

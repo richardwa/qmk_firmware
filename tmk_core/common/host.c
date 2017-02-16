@@ -22,6 +22,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "util.h"
 #include "debug.h"
 
+
+#ifdef NKRO_ENABLE
+bool keyboard_nkro = true;
+#endif
+
 static host_driver_t *driver;
 static uint16_t last_system_report = 0;
 static uint16_t last_consumer_report = 0;
@@ -81,7 +86,7 @@ void host_consumer_send(uint16_t report)
     (*driver->send_consumer)(report);
 }
 
-uint16_t host_last_system_report(void)
+uint16_t host_last_sysytem_report(void)
 {
     return last_system_report;
 }

@@ -1,0 +1,54 @@
+#!/usr/bin/perl
+use strict;
+#set array separator
+$, = ',';
+$" = ',';
+
+sub getSeq {
+    return addPrefix (1..shift);
+}
+sub addPrefix {
+    return map {"a".$_} @_;
+}
+sub range {
+    my $start = shift;
+    my $count = shift;
+    my $step = shift;
+    return map $start + $_*$step, 0..($count-1);
+}
+sub def {
+    print "#define @_\n";
+}
+my $ARGSIZE=3;
+my $LISTSIZE=5;
+
+# basics
+def "EMPTY()";
+def "COMMA() ,";
+def "PASS(...) __VA_ARGS__";
+
+#ARG counter
+foreach my $i (1..$ARGSIZE){
+    def "COUNT(@{[getSeq($i)]}) $i";
+}
+print "\n";
+#MAP
+def "MAP MAP1";
+for (my $i=1;$i<=$ARGSIZE;$i++){
+    for(my $j=1;$j<=$LISTSIZE;$j++){
+        my @arr1 = getSeq ($i*$j);
+        my @arr2 = map [addPrefix range $_,$i,$j],1..$j;
+        def "MAP$i(f,s,@arr1) ".join(" s() ",map {"f(@{$_})"} @arr2);
+    }
+    print "\n";
+}
+
+
+
+#define MAP(f,s,a)         f(a)
+#define MAP(f,s,a,b)       MAP(f,s,a) s() MAP(f,s,b)
+#define MAP(f,s,a,b,c)     MAP(f,s,a,b) s() MAP(f,s,c)
+#define MAP2(f,s,x,a)       f(x,a)
+#define MAP2(f,s,x,y,a,b)   MAP2(f,s,x,a) s() MAP2(f,s,y,b)
+#define MAP2(f,s,x,y,z,a,b,c) MAP2(f,s,x,y,a,b) s() MAP2(f,s,z,c)
+

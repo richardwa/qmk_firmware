@@ -1,0 +1,6 @@
+#include <avr/io.h>
+
+void ledMatrixInit();
+void draw();
+void setRowState(uint8_t row, uint8_t blues[], uint8_t reds[]);
+void setState(uint8_t row, uint8_t col, uint8_t blue, uint8_t red);
