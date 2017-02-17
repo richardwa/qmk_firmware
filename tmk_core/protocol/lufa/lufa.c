@@ -920,16 +920,23 @@ int main(void)
 #endif
 
     print("Keyboard start.\n");
+    uint8_t suspended = 0;
     while (1) {
         #ifndef BLUETOOTH_ENABLE
         while (USB_DeviceState == DEVICE_STATE_Suspended) {
             print("[s]");
+	    suspended = 1;
             suspend_power_down();
             if (USB_Device_RemoteWakeupEnabled && suspend_wakeup_condition()) {
                     USB_Device_SendRemoteWakeup();
             }
         }
         #endif
+
+	if (suspended){
+	   suspended = 0;
+	   suspend_wakeup_init();
+	}
 
 #ifdef MIDI_ENABLE
         midi_device_process(&midi_device);
