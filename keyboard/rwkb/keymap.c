@@ -20,7 +20,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   {KC_LCTL, KC_FN2, KC_LGUI, KC_LALT, 
       KC_FN0, 
       LT(_RS, KC_SPC),  
-      LT(_LW, KC_SPC),  
+      KC_SPC,  
       //KC_FN1, 
       KC_SPC,
    KC_LEFT, KC_DOWN, KC_UP,   KC_RGHT}
