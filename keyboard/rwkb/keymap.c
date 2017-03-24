@@ -11,6 +11,7 @@
 #define _LW 1
 #define _RS 2
 #define _OT 3 
+#define _GM 4 
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 [_QW] = { /* Qwerty */
@@ -21,8 +22,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
       KC_FN0, 
       LT(_RS, KC_SPC),  
       KC_SPC,  
-      //KC_FN1, 
-      KC_SPC,
+      KC_SPC, //KC_FN1 
    KC_LEFT, KC_DOWN, KC_UP,   KC_RGHT}
 },
 [_LW] = { /* LOWER */
@@ -39,9 +39,15 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 },
 [_OT] = { /* OTHER */
   {KC_TRNS, KC_TRNS, KC_MS_U, KC_WH_U, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, M(0) },
-  {KC_TRNS, KC_MS_L, KC_MS_D, KC_MS_R, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS },
+  {KC_TRNS, KC_MS_L, KC_MS_D, KC_MS_R, KC_TRNS, TG(_GM), KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS },
   {KC_TRNS, KC_TRNS, KC_TRNS, KC_WH_D, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS },
   {KC_TRNS, TG(_OT), KC_TRNS, KC_TRNS, KC_MS_BTN1, KC_MS_BTN2, KC_TRNS, KC_MS_BTN3, KC_MNXT, KC_VOLD, KC_VOLU, KC_MPLY}
+},
+[_GM] = { /* GAME MODE */
+  {KC_TAB,  KC_Q,    KC_W,    KC_E,    KC_R,    KC_T,    KC_Y,    KC_F1,   KC_F2,   KC_F3,   KC_F4,   TG(_GM)},
+  {KC_ESC,  KC_A,    KC_S,    KC_D,    KC_F,    KC_G,    KC_H,    KC_1,    KC_2,    KC_3,    KC_4,    KC_TRNS},
+  {KC_LSFT, KC_Z,    KC_X,    KC_C,    KC_V,    KC_B,    KC_N,    KC_M,    KC_COMM, KC_DOT,  KC_SLSH, KC_LSFT},
+  {KC_LCTL, KC_LALT, KC_LGUI, KC_RALT, KC_SPC,  KC_SPC,  KC_SPC,  KC_SPC,  KC_LEFT, KC_DOWN, KC_UP,   KC_RGHT}
 }
 };
 
